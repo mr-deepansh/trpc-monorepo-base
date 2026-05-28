@@ -88,6 +88,42 @@ yarn exec turbo dev --filter=web
 pnpm exec turbo dev --filter=web
 ```
 
+### Running Services
+
+Once you start the development server with `pnpm run dev`, the following services will be available:
+
+- **API Server**: Running on `http://localhost:8000`
+  - OpenAPI docs: `http://localhost:8000/docs`
+  - OpenAPI JSON: `http://localhost:8000/openapi.json`
+
+- **Web App**: Running on `http://localhost:3000`
+
+- **Database**: Drizzle Studio available at `https://local.drizzle.studio`
+
+### Environment Configuration
+
+The project requires the following environment variables in your `.env` file. You can copy `.env.example` as a starting point:
+
+```bash
+cp .env.example .env
+```
+
+Then update the values in `.env` with your actual configuration:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/dev"
+GOOGLE_OAUTH_CLIENT_ID="your-google-oauth-client-id"
+GOOGLE_OAUTH_CLIENT_SECRET="your-google-oauth-client-secret"
+GOOGLE_OAUTH_REDIRECT_URI="http://localhost:3000/api/auth/callback/google"
+NEXT_PUBLIC_API_URL="http://localhost:8000/trpc"
+PORT="8000"
+NODE_ENV="development"
+BASE_URL="http://localhost:8000"
+LOGGER_LEVEL="debug"
+```
+
+**Note**: Some environment variables in the services package (like `CORS`) are not currently being used and can be omitted if not needed for your implementation.
+
 ### Remote Caching
 
 > [!TIP]
