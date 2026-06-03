@@ -63,7 +63,7 @@ function createEnv(env: NodeJS.ProcessEnv): Env {
       "Invalid environment variables:\n",
       JSON.stringify(result.error.format(), null, 2),
     );
-    throw new Error("Invalid environment variables");
+    throw new Error("Invalid environment variables — see stderr for details");
   }
   return result.data;
 }

@@ -4,8 +4,11 @@ import { logger } from "./logger";
 
 export interface RequestContextInput {
   requestId?: string;
+  correlationId?: string;
+  traceId?: string;
   userId?: string;
   tenantId?: string;
+  sessionId?: string;
 }
 
 export async function withRequestContext<T>(
@@ -17,30 +20,22 @@ export async function withRequestContext<T>(
   return runWithContext(
     {
       requestId,
+      correlationId: input.correlationId,
+      traceId: input.traceId,
       userId: input.userId,
       tenantId: input.tenantId,
+      sessionId: input.sessionId,
     },
     async () => {
       try {
         const result = await fn();
-        logger.debug(
-          {
-            requestId,
-            durationMs: Date.now() - startedAt,
-          },
-          "Request completed",
-        );
+        logger.info({ requestId, durationMs: Date.now() - startedAt }, "Request completed");
         return result;
       } catch (error) {
         logger.error(
-          {
-            requestId,
-            durationMs: Date.now() - startedAt,
-            err: error,
-          },
+          { requestId, durationMs: Date.now() - startedAt, err: error },
           "Request failed",
         );
-
         throw error;
       }
     },

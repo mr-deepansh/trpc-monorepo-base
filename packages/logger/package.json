@@ -4,8 +4,12 @@
   "private": true,
   "main": "./index.ts",
   "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
   "scripts": {
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
@@ -17,9 +21,9 @@
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
     "@opentelemetry/auto-instrumentations-node": "^0.47.1",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.51.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.57.0",
     "@opentelemetry/resources": "^1.30.1",
-    "@opentelemetry/sdk-node": "^0.51.1",
+    "@opentelemetry/sdk-node": "^0.57.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
     "pino": "^9.14.0",
     "zod": "^4.3.5"

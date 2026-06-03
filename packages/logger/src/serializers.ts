@@ -1,51 +1,30 @@
-import { randomUUID } from "crypto";
-import { runWithContext } from "./context";
-import { logger } from "./logger";
+import type { IncomingMessage, ServerResponse } from "http";
+import type { ErrorLog, HttpRequestLog, HttpResponseLog } from "./types";
 
-export interface RequestContextInput {
-  requestId?: string;
-  correlationId?: string;
-  traceId?: string;
-  userId?: string;
-  tenantId?: string;
-  sessionId?: string;
-}
-
-export async function withRequestContext<T>(
-  input: RequestContextInput,
-  fn: () => Promise<T>,
-): Promise<T> {
-  const startedAt = Date.now();
-  const requestId = input.requestId ?? randomUUID();
-  return runWithContext(
-    {
-      requestId,
-      correlationId: input.correlationId,
-      traceId: input.traceId,
-      userId: input.userId,
-      tenantId: input.tenantId,
-      sessionId: input.sessionId,
-    },
-    async () => {
-      try {
-        const result = await fn();
-        logger.debug(
-          {
-            durationMs: Date.now() - startedAt,
-          },
-          "Request completed",
-        );
-        return result;
-      } catch (error) {
-        logger.error(
-          {
-            err: error,
-            durationMs: Date.now() - startedAt,
-          },
-          "Request failed",
-        );
-        throw error;
-      }
-    },
-  );
-}
+export const serializers = {
+  req(req: IncomingMessage & { id?: string }): HttpRequestLog {
+    const rawUrl = req.url ?? "/";
+    const url = rawUrl.includes("?") ? rawUrl.slice(0, rawUrl.indexOf("?")) : rawUrl;
+    return {
+      id: req.id,
+      method: req.method ?? "UNKNOWN",
+      url,
+      userAgent: req.headers["user-agent"],
+      ip: "[redacted]",
+    };
+  },
+  res(res: ServerResponse): HttpResponseLog {
+    return {
+      statusCode: res.statusCode,
+      contentLength: res.getHeader("content-length") as string | number | undefined,
+    };
+  },
+  err(err: Error & { code?: string }): ErrorLog {
+    return {
+      type: err.constructor?.name ?? "Error",
+      message: err.message,
+      code: err.code,
+      stack: process.env["NODE_ENV"] !== "production" ? err.stack : undefined,
+    };
+  },
+};

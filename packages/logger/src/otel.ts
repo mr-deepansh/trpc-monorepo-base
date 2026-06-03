@@ -1,6 +1,7 @@
 import { env } from "./env";
 
 let sdkStarted = false;
+let shutdownFn: (() => Promise<void>) | null = null;
 
 export async function initOtel(): Promise<void> {
   if (!env.OTEL_ENABLED || sdkStarted) {
@@ -10,48 +11,44 @@ export async function initOtel(): Promise<void> {
   const { NodeSDK } = await import("@opentelemetry/sdk-node");
   const { getNodeAutoInstrumentations } = await import("@opentelemetry/auto-instrumentations-node");
   const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");
+  const { Resource } = await import("@opentelemetry/resources");
+  const { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } =
+    await import("@opentelemetry/semantic-conventions");
+
   const sdk = new NodeSDK({
+    resource: new Resource({
+      [SEMRESATTRS_SERVICE_NAME]: env.SERVICE_NAME,
+      [SEMRESATTRS_SERVICE_VERSION]: env.SERVICE_VERSION,
+    }),
     traceExporter: new OTLPTraceExporter({
       url: env.OTEL_EXPORTER_OTLP_ENDPOINT,
     }),
     instrumentations: [
       getNodeAutoInstrumentations({
-        "@opentelemetry/instrumentation-fs": {
-          enabled: false,
-        },
+        "@opentelemetry/instrumentation-fs": { enabled: false },
       }),
     ],
   });
   await sdk.start();
-  const shutdown = async () => {
+  shutdownFn = async () => {
     try {
       await sdk.shutdown();
-    } catch {
-      // ignore shutdown errors
-    }
+    } catch {}
   };
-  process.on("SIGTERM", shutdown);
-  process.on("SIGINT", shutdown);
+  process.once("SIGTERM", shutdownFn);
+  process.once("SIGINT", shutdownFn);
 }
 
-export function getTraceContext(): {
-  traceId?: string;
-  spanId?: string;
-} {
+export function getTraceContext(): { traceId?: string; spanId?: string } {
   if (!env.OTEL_ENABLED) {
     return {};
   }
   try {
     const { trace } = require("@opentelemetry/api") as typeof import("@opentelemetry/api");
     const span = trace.getActiveSpan();
-    if (!span) {
-      return {};
-    }
-    const spanContext = span.spanContext();
-    return {
-      traceId: spanContext.traceId,
-      spanId: spanContext.spanId,
-    };
+    if (!span) return {};
+    const { traceId, spanId } = span.spanContext();
+    return { traceId, spanId };
   } catch {
     return {};
   }

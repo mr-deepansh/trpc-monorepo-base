@@ -91,19 +91,19 @@ pnpm exec turbo dev --filter=web
 ### Running Services
 
 Once you start the development server with `pnpm run dev`, the following services will be available:
-## Project URLs
 
 ## Project URLs
 
-| Service | URL | Purpose |
-|----------|----------|----------|
-| Web App | `http://localhost:3000` | Next.js frontend application |
-| API Server | `http://localhost:8000` | Express.js backend API with tRPC |
-| API Health | `http://localhost:8000/health` | API health check endpoint |
-| API OpenAPI Docs | `http://localhost:8000/api/reference` | Interactive API documentation (Scalar) |
-| Database UI | `https://local.drizzle.studio` | Drizzle Studio for database management |
-| PostgreSQL Database | `localhost:5432/dev` | PostgreSQL development database |
+## Project URLs
 
+| Service             | URL                                   | Purpose                                |
+| ------------------- | ------------------------------------- | -------------------------------------- |
+| Web App             | `http://localhost:3000`               | Next.js frontend application           |
+| API Server          | `http://localhost:8000`               | Express.js backend API with tRPC       |
+| API Health          | `http://localhost:8000/health`        | API health check endpoint              |
+| API OpenAPI Docs    | `http://localhost:8000/api/reference` | Interactive API documentation (Scalar) |
+| Database UI         | `https://local.drizzle.studio`        | Drizzle Studio for database management |
+| PostgreSQL Database | `localhost:5432/dev`                  | PostgreSQL development database        |
 
 ### Environment Configuration
 

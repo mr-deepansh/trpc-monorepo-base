@@ -1,7 +1,7 @@
-//  Supported log levels.
+/** Supported log levels. */
 export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "silent";
 
-//  Request and trace context stored in AsyncLocalStorage.
+/** Request and trace context stored in AsyncLocalStorage. */
 export interface LogContext {
   requestId?: string;
   traceId?: string;
@@ -12,16 +12,15 @@ export interface LogContext {
   tenantId?: string;
   sessionId?: string;
 }
-//  Service metadata attached to logs.
 
+/** Service metadata attached to every log line. */
 export interface ServiceContext {
   service: string;
   version?: string;
   environment?: string;
 }
 
-//  Event metadata for Kafka, NATS, RabbitMQ, etc.
-
+/** Event metadata for Kafka, NATS, RabbitMQ, etc. */
 export interface EventLog {
   eventId: string;
   eventType: string;
@@ -30,40 +29,44 @@ export interface EventLog {
   offset?: number;
   correlationId?: string;
 }
-//  Sanitized HTTP request log.
 
+/** Sanitized HTTP request log — query params are stripped, IP is always redacted. */
 export interface HttpRequestLog {
   id?: string;
   method: string;
-  // Query params are removed before logging.
   url: string;
   userAgent?: string;
-  // Never store real IP addresses.
   ip?: string;
 }
-// HTTP response metadata.
+
+/** HTTP response metadata. */
 export interface HttpResponseLog {
   statusCode: number;
-
   contentLength?: number | string;
 }
-// Performance and latency metrics.
+
+/** Performance and latency metrics. */
 export interface PerformanceLog {
   durationMs: number;
   dbDurationMs?: number;
   cacheHit?: boolean;
 }
-// Structured error payload.
+
+/**
+ * Structured error payload.
+ *
+ * FIXED: original file had `errorType` here but `serializers.ts` produced `type`.
+ * Unified to `type` to match the pino `err` serializer output and avoid
+ * silent field-mismatch bugs in consumers.
+ */
 export interface ErrorLog {
-  errorType: string;
-
+  type: string;
   message: string;
-
   code?: string;
-
   stack?: string;
 }
-// Common fields shared by all logs.
+
+/** Common fields shared by all log lines. */
 export interface BaseLog {
   timestamp?: string;
   level?: LogLevel;

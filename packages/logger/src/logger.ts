@@ -30,15 +30,18 @@ export const logger: Logger = pino({
     service: env.SERVICE_NAME,
     version: env.SERVICE_VERSION,
     environment: env.NODE_ENV,
+    namespace: env.SERVICE_NAMESPACE,
+    instanceId: env.SERVICE_INSTANCE_ID,
+    hostname: env.HOSTNAME,
+    pod: env.POD_NAME,
+    commitSha: env.COMMIT_SHA,
     ...(env.AWS_REGION ? { region: env.AWS_REGION } : {}),
   },
   // Use ISO timestamp format
   timestamp: pino.stdTimeFunctions.isoTime,
-  // Custom serializers for request, response and error logs
   serializers,
-  // Remove sensitive data before logging
   redact: {
-    paths: REDACT_PATHS,
+    paths: REDACT_PATHS as string[],
     censor: "[redacted]",
   },
   // Add request and trace context automatically

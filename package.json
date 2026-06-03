@@ -8,6 +8,7 @@
     "db:migrate": "dotenv -- turbo db:migrate",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "typecheck": "tsc --noEmit",
     "check-types": "turbo run check-types"
   },
   "devDependencies": {
