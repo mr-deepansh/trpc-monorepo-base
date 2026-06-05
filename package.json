@@ -9,7 +9,11 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "typecheck": "tsc --noEmit",
-    "check-types": "turbo run check-types"
+    "check-types": "turbo run check-types",
+    "infra:postgres": "docker compose -f infra/docker-compose.yml up -d",
+    "infra:otel": "docker compose -f infra/otel.compose.yml up -d",
+    "infra:postgres:down": "docker compose -f infra/docker-compose.yml down",
+    "infra:otel:down": "docker compose -f infra/otel.compose.yml down"
   },
   "devDependencies": {
     "prettier": "^3.7.4",
