@@ -386,14 +386,14 @@ importers:
         specifier: ^5.9.3
         version: 5.9.3
 
-  packages/services:
+  packages/modules/auth-service:
     dependencies:
       '@repo/database':
         specifier: workspace:*
-        version: link:../database
+        version: link:../../database
       '@repo/logger':
         specifier: workspace:*
-        version: link:../logger
+        version: link:../../logger
       google-auth-library:
         specifier: ^10.5.0
         version: 10.5.0
@@ -401,24 +401,15 @@ importers:
         specifier: ^4.3.5
         version: 4.3.5
     devDependencies:
-      '@repo/eslint-config':
-        specifier: workspace:*
-        version: link:../eslint-config
       '@repo/typescript-config':
         specifier: workspace:*
-        version: link:../typescript-config
-      dotenv-cli:
-        specifier: ^11.0.0
-        version: 11.0.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
+        version: link:../../typescript-config
 
   packages/trpc:
     dependencies:
-      '@repo/services':
+      '@repo/auth-service':
         specifier: workspace:*
-        version: link:../services
+        version: link:../modules/auth-service
       '@trpc/client':
         specifier: ^11.8.1
         version: 11.8.1(@trpc/server@11.8.1(typescript@5.9.3))(typescript@5.9.3)

@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "packages/*"
+  - "packages/modules/*"
 allowBuilds:
   '@swc/core': true
   esbuild: true

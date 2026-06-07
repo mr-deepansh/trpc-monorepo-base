@@ -164,6 +164,12 @@ yarn exec turbo link
 pnpm exec turbo link
 ```
 
+## Generate folder structure file:
+
+```sh
+find . -type d \( -name node_modules -o -name dist -o -name build -o -name .next -o -name .turbo -o -name .git \) -prune -o -print > structure.txt
+```
+
 ## Useful Links
 
 Learn more about the power of Turborepo:

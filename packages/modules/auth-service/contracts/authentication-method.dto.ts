@@ -6,6 +6,7 @@ export const getAuthenticationMethodOutputSchema = z.object({
   displayText: z.string().optional(),
   authUrl: z.string(),
 });
+
 export type GetAuthenticationMethodOutputSchema = z.infer<
   typeof getAuthenticationMethodOutputSchema
 >;
