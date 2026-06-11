@@ -202,6 +202,7 @@
 ./packages/typescript-config/nextjs.json
 ./packages/typescript-config/node.json
 ./packages/typescript-config/package.json
+./packages.zip
 ./pnpm-lock.yaml
 ./pnpm-workspace.yaml
 ./prettier.config.js

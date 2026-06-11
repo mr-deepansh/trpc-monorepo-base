@@ -1,8 +1,5 @@
 import { z, zodUndefinedModel } from "../../schema";
-import {
-  getAuthenticationMethodOutputSchema,
-  getAuthenticationMethods,
-} from "@repo/auth-service";
+import { getAuthenticationMethodOutputSchema, getAuthenticationMethods } from "@repo/auth-service";
 import { publicProcedure, router } from "../../trpc";
 import { generatePath } from "../../utils/path-generator";
 

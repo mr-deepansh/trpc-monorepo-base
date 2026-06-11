@@ -1,5 +1,5 @@
-import { z } from "zod";
+const envSchema = z.object({
+  GOOGLE_CLIENT_ID: z.string().min(1),
+});
 
-export const env = {
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
-};
+export const env = envSchema.parse(process.env);
