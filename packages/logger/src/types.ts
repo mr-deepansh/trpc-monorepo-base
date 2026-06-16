@@ -1,7 +1,31 @@
-/** Supported log levels. */
-export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "silent";
+// ============================================================================
+// LOGGING CORE TYPES
+// ============================================================================
 
-/** Request and trace context stored in AsyncLocalStorage. */
+/**
+ * Supported logger severity levels.
+ *
+ * WHY:
+ * - Matches common structured logging systems.
+ * - `silent` disables log emission without changing call sites.
+ */
+export type LogLevel =
+  | "trace"
+  | "debug"
+  | "info"
+  | "warn"
+  | "error"
+  | "fatal"
+  | "silent";
+
+/**
+ * Distributed tracing and request-scoped context.
+ *
+ * WHY:
+ * - Propagated through AsyncLocalStorage.
+ * - Enables correlation across services, queues and databases.
+ * - Every request should have at least a requestId.
+ */
 export interface LogContext {
   requestId?: string;
   traceId?: string;
@@ -13,14 +37,32 @@ export interface LogContext {
   sessionId?: string;
 }
 
-/** Service metadata attached to every log line. */
+/**
+ * Immutable service metadata attached to every log entry.
+ *
+ * WHY:
+ * - Required for multi-service environments.
+ * - Allows filtering by service, version and deployment environment.
+ */
 export interface ServiceContext {
   service: string;
   version?: string;
   environment?: string;
 }
 
-/** Event metadata for Kafka, NATS, RabbitMQ, etc. */
+/**
+ * Event bus metadata.
+ *
+ * Used for:
+ * - Kafka
+ * - RabbitMQ
+ * - NATS
+ * - SQS
+ * - Other asynchronous messaging systems
+ *
+ * WHY:
+ * Enables event lineage and message traceability.
+ */
 export interface EventLog {
   eventId: string;
   eventType: string;
@@ -30,7 +72,14 @@ export interface EventLog {
   correlationId?: string;
 }
 
-/** Sanitized HTTP request log — query params are stripped, IP is always redacted. */
+/**
+ * Sanitized HTTP request metadata.
+ *
+ * SECURITY:
+ * - Query parameters must never be logged.
+ * - Sensitive headers must be redacted upstream.
+ * - IP addresses should always be masked or removed.
+ */
 export interface HttpRequestLog {
   id?: string;
   method: string;
@@ -39,13 +88,24 @@ export interface HttpRequestLog {
   ip?: string;
 }
 
-/** HTTP response metadata. */
+/**
+ * HTTP response metadata.
+ *
+ * WHY:
+ * Enables latency, throughput and status-code monitoring.
+ */
 export interface HttpResponseLog {
   statusCode: number;
   contentLength?: number | string;
 }
 
-/** Performance and latency metrics. */
+/**
+ * Performance metrics attached to a log event.
+ *
+ * PERF:
+ * Used for identifying slow requests,
+ * database bottlenecks and cache effectiveness.
+ */
 export interface PerformanceLog {
   durationMs: number;
   dbDurationMs?: number;
@@ -55,9 +115,9 @@ export interface PerformanceLog {
 /**
  * Structured error payload.
  *
- * FIXED: original file had `errorType` here but `serializers.ts` produced `type`.
- * Unified to `type` to match the pino `err` serializer output and avoid
- * silent field-mismatch bugs in consumers.
+ * WHY:
+ * Errors must be machine-readable for alerting,
+ * dashboards and incident investigations.
  */
 export interface ErrorLog {
   type: string;
@@ -66,7 +126,13 @@ export interface ErrorLog {
   stack?: string;
 }
 
-/** Common fields shared by all log lines. */
+/**
+ * Common fields shared by all log records.
+ *
+ * ARCH:
+ * Acts as the foundational contract for every
+ * structured log emitted by the application.
+ */
 export interface BaseLog {
   timestamp?: string;
   level?: LogLevel;
@@ -76,3 +142,4 @@ export interface BaseLog {
   spanId?: string;
   correlationId?: string;
 }
+

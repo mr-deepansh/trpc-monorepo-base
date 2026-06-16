@@ -25,7 +25,7 @@ export async function logProcedure<T>(
   }
 }
 
-/// Detect tRPC client errors (4xx) without importing the whole @trpc/server
+// Detect tRPC client errors (4xx) without importing the whole @trpc/server
 function isTRPCClientError(error: unknown): boolean {
   if (
     error !== null &&
