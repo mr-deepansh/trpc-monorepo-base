@@ -4,14 +4,15 @@
   "scripts": {
     "db:migrate": "dotenv -- drizzle-kit migrate",
     "db:generate": "dotenv -- drizzle-kit generate",
-    "dev": "dotenv -- drizzle-kit studio"
+    "dev": "dotenv -- drizzle-kit studio",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/pg": "^8.16.0",
     "dotenv-cli": "^11.0.0",
-    "drizzle-kit": "^0.31.8",
+    "drizzle-kit": "^0.31.10",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   },

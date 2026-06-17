@@ -9,14 +9,7 @@
  * - Matches common structured logging systems.
  * - `silent` disables log emission without changing call sites.
  */
-export type LogLevel =
-  | "trace"
-  | "debug"
-  | "info"
-  | "warn"
-  | "error"
-  | "fatal"
-  | "silent";
+export type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal" | "silent";
 
 /**
  * Distributed tracing and request-scoped context.
@@ -142,4 +135,3 @@ export interface BaseLog {
   spanId?: string;
   correlationId?: string;
 }
-

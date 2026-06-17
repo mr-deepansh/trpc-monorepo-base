@@ -13,7 +13,7 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Streamyst",
+  title: "trpcProject",
   description: "Media Forwarding",
 };
 

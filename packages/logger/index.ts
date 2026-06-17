@@ -3,7 +3,6 @@ export * from "./src/env";
 export * from "./src/event";
 export * from "./src/logger";
 export * from "./src/middleware";
-export * from "./src/otel";
 export * from "./src/redact";
 export * from "./src/serializers";
 export * from "./src/trpc";

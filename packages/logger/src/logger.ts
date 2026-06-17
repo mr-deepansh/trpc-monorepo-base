@@ -2,7 +2,7 @@ import pino, { type Logger } from "pino";
 import { env } from "./env";
 import { serializers } from "./serializers";
 import { getContext } from "./context";
-import { getTraceContext } from "./otel";
+import { getTraceContext } from "@repo/observability";
 import { REDACT_PATHS } from "./redact";
 
 const isDev = env.NODE_ENV === "development";

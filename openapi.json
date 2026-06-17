@@ -1,0 +1,280 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "trpcProject OpenAPI",
+    "version": "1.0.0",
+    "description": "trpcProject API - Stream in Style. This API provides endpoints for health checks and authentication management.",
+    "contact": {
+      "name": "trpcProject Platform Team",
+      "url": "https://trpcProject.com"
+    },
+    "license": {
+      "name": "Private"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000/api",
+      "description": "Development server"
+    },
+    {
+      "url": "https://api.trpcProject.com/api",
+      "description": "Production server"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health.getHealth",
+        "summary": "Get server health status",
+        "description": "Returns the health status of the trpcProject server. This endpoint can be used for health checks in load balancers and monitoring systems.",
+        "tags": ["Health"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Server is healthy and operational",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthStatus"
+                },
+                "example": {
+                  "status": "healthy"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request - Invalid input parameters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/authentication/supported-providers": {
+      "get": {
+        "operationId": "auth.getSupportedAuthenticationProviders",
+        "summary": "Get supported authentication providers",
+        "description": "Returns a list of available authentication providers that users can use to sign in to the trpcProject platform. Currently supports Google OAuth.",
+        "tags": ["Authentication"],
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of authentication providers retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuthenticationMethod"
+                  },
+                  "readOnly": true
+                },
+                "example": [
+                  {
+                    "provider": "GOOGLE_OAUTH",
+                    "displayName": "Google",
+                    "displayText": "Sign in with Google",
+                    "authUrl": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+                  }
+                ]
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HealthStatus": {
+        "type": "object",
+        "description": "Server health status response",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["healthy"],
+            "description": "Current status of the server"
+          }
+        },
+        "required": ["status"],
+        "example": {
+          "status": "healthy"
+        }
+      },
+      "AuthenticationMethod": {
+        "type": "object",
+        "description": "Authentication provider information",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "enum": ["GOOGLE_OAUTH"],
+            "description": "Type of authentication provider"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "Human-readable name of the provider (e.g., 'Google')",
+            "example": "Google"
+          },
+          "displayText": {
+            "type": "string",
+            "description": "Text to display on authentication button",
+            "example": "Sign in with Google"
+          },
+          "authUrl": {
+            "type": "string",
+            "format": "uri",
+            "description": "URL to initiate the authentication flow",
+            "example": "https://accounts.google.com/o/oauth2/v2/auth?client_id=..."
+          }
+        },
+        "required": ["provider", "authUrl"],
+        "example": {
+          "provider": "GOOGLE_OAUTH",
+          "displayName": "Google",
+          "displayText": "Sign in with Google",
+          "authUrl": "https://accounts.google.com/o/oauth2/v2/auth"
+        }
+      },
+      "Error": {
+        "type": "object",
+        "description": "Error response",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Human-readable error message"
+              },
+              "code": {
+                "type": "string",
+                "description": "Machine-readable error code"
+              },
+              "issues": {
+                "type": "array",
+                "description": "Detailed validation issues (if applicable)",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            },
+            "required": ["message", "code"]
+          }
+        },
+        "required": ["error"],
+        "example": {
+          "error": {
+            "message": "Invalid request",
+            "code": "BAD_REQUEST"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token authentication (future implementation)"
+      },
+      "apiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-API-Key",
+        "description": "API key authentication (future implementation)"
+      }
+    },
+    "parameters": {
+      "RequestId": {
+        "name": "x-request-id",
+        "in": "header",
+        "description": "Unique identifier for request tracing",
+        "required": false,
+        "schema": {
+          "type": "string",
+          "format": "uuid"
+        }
+      },
+      "CorrelationId": {
+        "name": "x-correlation-id",
+        "in": "header",
+        "description": "Correlation ID for distributed tracing across services",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "UserId": {
+        "name": "x-user-id",
+        "in": "header",
+        "description": "Authenticated user identifier",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Health check and monitoring endpoints"
+    },
+    {
+      "name": "Authentication",
+      "description": "Authentication and authorization endpoints for user management"
+    }
+  ],
+  "externalDocs": {
+    "description": "Find more info about trpcProject API",
+    "url": "https://docs.trpcProject.com"
+  }
+}

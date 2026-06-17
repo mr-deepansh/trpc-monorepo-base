@@ -12,7 +12,7 @@ async function init() {
       logger.info(`http server is running on PORT ${PORT}`);
     });
   } catch (err) {
-    logger.error(`Error creating http server`, { err });
+    logger.error({ err }, `Error creating http server`);
     process.exit(1);
   }
 }

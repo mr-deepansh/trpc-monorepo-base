@@ -9,8 +9,9 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@repo/auth-service": "workspace:*",
     "@repo/logger": "workspace:*",
+    "@repo/observability": "workspace:*",
+    "@repo/auth-service": "workspace:*",
     "@trpc/client": "^11.8.1",
     "@trpc/server": "^11.8.1",
     "trpc-to-openapi": "^3.1.0",
