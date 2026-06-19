@@ -7,3 +7,6 @@ export * from "./src/redact";
 export * from "./src/serializers";
 export * from "./src/trpc";
 export * from "./src/types";
+export * from "./src/express";
+export * from "./src/error-handler";
+export * from "./src/http";

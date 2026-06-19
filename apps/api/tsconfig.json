@@ -2,11 +2,8 @@
   "extends": "@repo/typescript-config/node.json",
   "compilerOptions": {
     "outDir": "./dist",
-
     "moduleResolution": "Node",
     "module": "CommonJS",
-
-    // We don't need these for our final build
     "declarationMap": false,
     "declaration": false,
     "sourceMap": false

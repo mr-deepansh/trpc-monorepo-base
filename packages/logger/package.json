@@ -11,10 +11,15 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "express": ">=4.0.0"
+  },
   "devDependencies": {
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
+    "@types/express": "^5.0.6",
     "@types/node": "^20.0.0",
+    "express": "^5.2.1",
     "pino-pretty": "^11.3.0",
     "typescript": "^5.9.3"
   },

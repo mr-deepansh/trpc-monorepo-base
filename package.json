@@ -9,6 +9,7 @@
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "typecheck": "tsc --noEmit",
+    "clean": "turbo clean",
     "infra:postgres": "docker compose -f infra/docker-compose.yml up -d",
     "infra:otel": "docker compose -f infra/otel.compose.yml up -d",
     "infra:postgres:down": "docker compose -f infra/docker-compose.yml down",

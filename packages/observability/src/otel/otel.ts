@@ -1,9 +1,8 @@
-// packages/observability/src/otel.ts
+// packages/observability/src/otel/otel.ts
 
 import { env } from "./env";
 
 let sdkInitPromise: Promise<void> | null = null;
-let shutdownFn: (() => Promise<void>) | null = null;
 
 export async function initOtel(): Promise<void> {
   if (!env.OTEL_ENABLED) {
@@ -17,14 +16,19 @@ export async function initOtel(): Promise<void> {
     const { NodeSDK } = await import("@opentelemetry/sdk-node");
     const { getNodeAutoInstrumentations } =
       await import("@opentelemetry/auto-instrumentations-node");
-    const { OTLPTraceExporter } = await import("@opentelemetry/exporter-trace-otlp-http");
+    const { OTLPTraceExporter } = await import(
+      "@opentelemetry/exporter-trace-otlp-http"
+    );
     const { Resource } = await import("@opentelemetry/resources");
-    const { SEMRESATTRS_SERVICE_NAME, SEMRESATTRS_SERVICE_VERSION } =
-      await import("@opentelemetry/semantic-conventions");
+    // Use stable attribute names (SEMRESATTRS_* are deprecated since v1.0)
+    const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = await import(
+      "@opentelemetry/semantic-conventions"
+    );
+
     const sdk = new NodeSDK({
       resource: new Resource({
-        [SEMRESATTRS_SERVICE_NAME]: env.SERVICE_NAME,
-        [SEMRESATTRS_SERVICE_VERSION]: env.SERVICE_VERSION,
+        [ATTR_SERVICE_NAME]: env.SERVICE_NAME,
+        [ATTR_SERVICE_VERSION]: env.SERVICE_VERSION,
       }),
       traceExporter: new OTLPTraceExporter({
         url: env.OTEL_EXPORTER_OTLP_ENDPOINT,
@@ -37,16 +41,19 @@ export async function initOtel(): Promise<void> {
         }),
       ],
     });
+
     await sdk.start();
-    shutdownFn = async () => {
+
+    const shutdown = async () => {
       try {
         await sdk.shutdown();
       } catch (error) {
         console.error("Error shutting down OpenTelemetry SDK:", error);
       }
     };
-    process.once("SIGTERM", shutdownFn);
-    process.once("SIGINT", shutdownFn);
+
+    process.once("SIGTERM", shutdown);
+    process.once("SIGINT", shutdown);
   })();
 
   return sdkInitPromise;
@@ -60,16 +67,15 @@ export function getTraceContext(): {
     return {};
   }
   try {
+    // Use dynamic import-style require to stay compatible with CJS/ESM interop.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { trace } = require("@opentelemetry/api") as typeof import("@opentelemetry/api");
     const span = trace.getActiveSpan();
     if (!span) {
       return {};
     }
     const { traceId, spanId } = span.spanContext();
-    return {
-      traceId,
-      spanId,
-    };
+    return { traceId, spanId };
   } catch {
     return {};
   }

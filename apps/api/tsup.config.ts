@@ -2,7 +2,7 @@ import { defineConfig } from "tsup";
 
 export default defineConfig({
   entry: ["./src/index.ts"],
-  noExternal: ["@endless"], // transpile packages starting with `@endless` and their dependencies
+  noExternal: [/^@repo\//],
   splitting: false,
   bundle: true,
   outDir: "./dist",

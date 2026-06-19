@@ -12,4 +12,16 @@ const envSchema = z.object({
   SERVICE_VERSION: z.string().default("1.0.0"),
 });
 
-export const env = envSchema.parse(process.env);
+function createEnv(env: NodeJS.ProcessEnv) {
+  const result = envSchema.safeParse(env);
+  if (!result.success) {
+    console.error(
+      "[@repo/observability] Invalid environment variables:\n",
+      JSON.stringify(result.error.format(), null, 2),
+    );
+    throw new Error("[@repo/observability] Invalid environment variables — see stderr for details");
+  }
+  return result.data;
+}
+
+export const env = createEnv(process.env);

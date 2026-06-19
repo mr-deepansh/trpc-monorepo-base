@@ -186,7 +186,7 @@ BASE_URL="http://localhost:8000"
 
 # Logging
 NODE_ENV="development"
-LOGGER_LEVEL="debug"            # debug | info | warn | error
+LOGGER_LEVEL="debug"            # trace | debug | info | warn | error | fatal | silent
 ```
 
 Environment schemas are validated at startup using typed env parsers (`apps/api/src/env.ts`, `apps/web/env.js`). Invalid or missing variables cause a hard crash at boot — intentionally, to prevent silent misconfiguration in production.

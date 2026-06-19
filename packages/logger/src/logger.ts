@@ -5,11 +5,9 @@ import { getContext } from "./context";
 import { getTraceContext } from "@repo/observability";
 import { REDACT_PATHS } from "./redact";
 
-const isDev = env.NODE_ENV === "development";
-
-// Pretty logs in development, JSON logs in production
+// Pretty logs when LOG_FORMAT=pretty, JSON otherwise
 function buildTransport() {
-  if (!isDev) return undefined;
+  if (env.LOG_FORMAT !== "pretty") return undefined;
   return {
     target: "pino-pretty",
     options: {

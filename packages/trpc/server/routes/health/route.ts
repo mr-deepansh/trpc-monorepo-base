@@ -12,7 +12,7 @@ export const healthRouter = router({
     )
     .query(async () => {
       return {
-        status: "healthy",
+        status: "healthy" as const,
       };
     }),
 });

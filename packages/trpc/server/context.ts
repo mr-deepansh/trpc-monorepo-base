@@ -2,9 +2,16 @@ import { randomUUID } from "crypto";
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 
 export async function createContext(opts: CreateExpressContextOptions) {
-  const requestId = (opts.req.headers["x-request-id"] as string) ?? randomUUID();
-  const correlationId = opts.req.headers["x-correlation-id"] as string | undefined;
-  const userId = opts.req.headers["x-user-id"] as string | undefined;
+  // Headers can be string | string[] | undefined — always take the first value
+  const rawHeader = (key: string): string | undefined => {
+    const val = opts.req.headers[key];
+    return Array.isArray(val) ? val[0] : val;
+  };
+
+  const requestId = rawHeader("x-request-id") ?? randomUUID();
+  const correlationId = rawHeader("x-correlation-id");
+  const userId = rawHeader("x-user-id");
+
   return {
     requestId,
     correlationId,
