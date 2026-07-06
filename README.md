@@ -1,7 +1,7 @@
 # Enterprise Monorepo — tRPC / Next.js / Express
 
-> **Audience:** SDE-3 · Staff · Principal Engineers  
-> This document assumes fluency with TypeScript, monorepo tooling, and distributed systems. It focuses on architectural intent, contract boundaries, and extension points rather than beginner setup.
+> **Audience:** SDE-3 · Staff · Principal Engineers
+> Assumes fluency with TypeScript, monorepo tooling, and distributed systems. Covers architectural intent, contract boundaries, and extension points. Not a getting-started guide.
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## Architecture Overview
 
-This repository implements a **full-stack TypeScript monorepo** using Turborepo. The system is structured around a clear separation of concerns:
+Full-stack TypeScript monorepo on Turborepo. The topology is intentionally boring — one API process, one frontend, one database. Complexity lives in the type system and module boundaries, not in infrastructure.
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -46,12 +46,12 @@ This repository implements a **full-stack TypeScript monorepo** using Turborepo.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Key architectural invariants:**
+**Non-negotiable invariants — violating these breaks the contract:**
 
-- All inter-process communication goes through tRPC. No raw REST calls between `web` and `api`.
-- Business logic lives exclusively in `packages/modules/*-service`. Apps are thin shells.
-- The `packages/database` package is the single source of truth for schema and migrations. No ad-hoc SQL elsewhere.
-- Observability (tracing, metrics) is instrumented at the tRPC middleware layer — not scattered across handlers.
+- All `web` → `api` communication goes through tRPC. No raw `fetch` calls to the API from the frontend. If you need a one-off REST endpoint for an external consumer, expose it via `trpc-to-openapi` — don't add a parallel Express route.
+- Business logic lives exclusively in `packages/modules/*-service`. Apps are thin shells: they mount routers, configure middleware, and boot the process. Nothing else.
+- `packages/database` is the single source of truth for schema and migrations. No inline SQL, no `pg` client instantiation outside this package.
+- Observability is instrumented at the tRPC middleware layer. Don't add `console.log` or manual span creation inside procedure handlers — the middleware already captures procedure path, input shape, duration, and error codes.
 
 ---
 
@@ -67,9 +67,9 @@ This repository implements a **full-stack TypeScript monorepo** using Turborepo.
 │   ├── modules/
 │   │   ├── auth-service/      # Authentication domain (login, register, OAuth)
 │   │   └── user-service/      # User domain (profile, preferences)
-│   ├── trpc/                  # Shared tRPC router definition, context, middleware
-│   ├── logger/                # Structured logger (Pino), tRPC middleware integration
-│   ├── observability/         # OpenTelemetry setup, health checks, metrics
+│   ├── trpc/                  # Shared router definition, context, middleware
+│   ├── logger/                # Structured logger (Pino) + tRPC middleware
+│   ├── observability/         # OpenTelemetry bootstrap, health checks, metrics
 │   ├── eslint-config/         # Shared ESLint rule sets
 │   └── typescript-config/     # Shared tsconfig presets
 ├── infra/
@@ -82,42 +82,44 @@ This repository implements a **full-stack TypeScript monorepo** using Turborepo.
 
 ## Technical Stack & Design Decisions
 
-| Layer           | Technology              | Rationale                                                                |
-| --------------- | ----------------------- | ------------------------------------------------------------------------ |
-| API Framework   | Express + tRPC          | Type-safe RPC without code generation; schema lives in TypeScript        |
-| Frontend        | Next.js 14 (App Router) | Server Components + tRPC server-side calls reduce client bundle          |
-| ORM             | Drizzle ORM             | SQL-first, zero runtime overhead, excellent TypeScript inference         |
-| Database        | PostgreSQL              | Battle-tested; Drizzle Studio for local introspection                    |
-| Logging         | Pino                    | Structured JSON logs; low-overhead; tRPC middleware integration          |
-| Telemetry       | OpenTelemetry (OTEL)    | Vendor-neutral traces/metrics; collector-based export                    |
-| Build           | Turborepo               | Incremental builds with remote caching; task graph aware of package deps |
-| Package Manager | pnpm                    | Strict node_modules, workspace protocol, faster installs                 |
+Every choice here was made deliberately. Before proposing a swap, understand the tradeoff being accepted.
+
+| Layer           | Technology              | Why this, not something else                                                                                      |
+| --------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| API Framework   | Express + tRPC          | Type-safe RPC with zero codegen. The schema is the contract — no proto files, no OpenAPI-first generation.        |
+| Frontend        | Next.js 14 (App Router) | Server Components + server-side tRPC callers eliminate redundant client fetches. RSC is load-bearing here.        |
+| ORM             | Drizzle ORM             | SQL-first. You write SQL-shaped code; Drizzle gives you types. No magic, no N+1 surprises hidden behind abstractions. |
+| Database        | PostgreSQL              | No exotic features in use. Chosen for operational maturity and Drizzle Studio support for local introspection.    |
+| Logging         | Pino                    | Lowest-overhead structured logger in the Node ecosystem. JSON output, tRPC middleware integration built-in.       |
+| Telemetry       | OpenTelemetry (OTEL)    | Vendor-neutral. Swap the exporter config without touching application code.                                       |
+| Build           | Turborepo               | Task graph is aware of the package dependency graph. Incremental builds and remote caching are first-class.       |
+| Package Manager | pnpm                    | Strict `node_modules` prevents phantom dependency bugs. Workspace protocol keeps internal package versions pinned. |
 
 ---
 
 ## Package Contracts & Dependency Graph
 
-Understanding the dependency graph is critical before modifying shared packages — changes propagate downstream.
+Understand this before touching any shared package. A change to `packages/database` schema propagates to every consumer in the graph.
 
 ```
-apps/api  ──────────────────────────────────────────────┐
-  └─► packages/trpc (server)                            │
-        └─► packages/modules/auth-service               │
-              └─► packages/database                     │
-              └─► packages/logger                       │
-        └─► packages/observability                      │
-        └─► packages/logger                             │
-                                                        │
-apps/web  ──────────────────────────────────────────────┘
+apps/api
+  └─► packages/trpc (server)
+        └─► packages/modules/auth-service
+              └─► packages/database
+              └─► packages/logger
+        └─► packages/observability
+        └─► packages/logger
+
+apps/web
   └─► packages/trpc (client)
   └─► packages/logger
 ```
 
 **Hard rules:**
 
-- `packages/database` must never import from `packages/modules/*`. Data models are defined here; business logic lives upstream.
-- `packages/trpc` exports two distinct entry points: `@repo/trpc/server` and `@repo/trpc/client`. Never import server-side context into client bundles.
-- Module packages (`auth-service`, `user-service`) are domain-isolated. Cross-module calls go through tRPC routes, not direct imports.
+- `packages/database` has no upstream imports. It knows nothing about modules or business logic. If you find yourself wanting to add a service call here, the abstraction is wrong.
+- `packages/trpc` exports two distinct entry points: `@repo/trpc/server` and `@repo/trpc/client`. The server entry point contains request context with DB and session references — it must never land in a client bundle. The bundler won't catch this for you; the import discipline is yours.
+- Module packages are domain-isolated. Cross-domain calls go through tRPC routes, not direct imports. This is what keeps bounded contexts from collapsing into a distributed monolith.
 
 ---
 
@@ -132,51 +134,36 @@ apps/web  ───────────────────────�
 ### First-time Setup
 
 ```bash
-# 1. Install dependencies
 pnpm install
-
-# 2. Start infrastructure
 docker-compose -f infra/docker-compose.yml up -d
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env — see Environment Configuration below
-
-# 4. Run database migrations
+cp .env.example .env          # fill in values — see Environment Configuration
 pnpm --filter @repo/database db:migrate
-
-# 5. Start all services
 turbo dev
 ```
 
 ### Selective Development
 
 ```bash
-# Run only the API (and its package dependencies)
-turbo dev --filter=api
-
-# Run only the web app
-turbo dev --filter=web
-
-# Build a single package and its dependents
-turbo build --filter=...@repo/database
+turbo dev --filter=api        # API + its package deps only
+turbo dev --filter=web        # web app only
+turbo build --filter=...@repo/database  # package + all downstream consumers
 ```
 
-> `...packageName` is Turborepo filter syntax meaning "this package and everything that depends on it." Use it when making changes to shared packages to verify you haven't broken consumers.
+`...packageName` is Turborepo filter syntax for "this package and everything that depends on it." Use it when modifying shared packages to verify you haven't broken consumers before pushing.
 
 ---
 
 ## Environment Configuration
 
-Copy `.env.example` to `.env` at the repo root. Per-app `.env` files in `apps/api` and `apps/web` are loaded by their respective processes.
+Root `.env` is the primary config surface. Per-app `.env` files in `apps/api` and `apps/web` are loaded by their respective processes and take precedence for app-specific variables.
 
 ```env
 # Database
 DATABASE_URL="postgresql://postgres:postgres@localhost:5432/dev"
 
 # Google OAuth
-GOOGLE_OAUTH_CLIENT_ID="your-client-id"
-GOOGLE_OAUTH_CLIENT_SECRET="your-client-secret"
+GOOGLE_OAUTH_CLIENT_ID="<your-client-id>"
+GOOGLE_OAUTH_CLIENT_SECRET="<your-client-secret>"
 GOOGLE_OAUTH_REDIRECT_URI="http://localhost:3000/api/auth/callback/google"
 
 # API
@@ -186,10 +173,10 @@ BASE_URL="http://localhost:8000"
 
 # Logging
 NODE_ENV="development"
-LOGGER_LEVEL="debug"            # trace | debug | info | warn | error | fatal | silent
+LOGGER_LEVEL="debug"    # trace | debug | info | warn | error | fatal | silent
 ```
 
-Environment schemas are validated at startup using typed env parsers (`apps/api/src/env.ts`, `apps/web/env.js`). Invalid or missing variables cause a hard crash at boot — intentionally, to prevent silent misconfiguration in production.
+Environment schemas are validated at startup via typed parsers (`apps/api/src/env.ts`, `apps/web/env.js`). Missing or malformed variables cause a hard crash at boot. This is intentional — silent misconfiguration in production is worse than a failed deploy.
 
 ---
 
@@ -210,44 +197,42 @@ server/
 **Adding a new route:**
 
 1. Create `packages/trpc/server/routes/<domain>/route.ts`
-2. Export a router using the `router()` and `publicProcedure` / `protectedProcedure` builders from `trpc.ts`
+2. Build the router using `router()` and `publicProcedure` / `protectedProcedure` from `trpc.ts`
 3. Register it in `packages/trpc/server/index.ts`
-4. Types propagate automatically to the client — no codegen step required
+4. Types propagate to the client automatically — no codegen, no manual type sync
 
 **Procedure types:**
 
-- `publicProcedure` — unauthenticated, available to all callers
-- `protectedProcedure` — requires valid session in context; throws `UNAUTHORIZED` otherwise
+- `publicProcedure` — unauthenticated. No session required.
+- `protectedProcedure` — session required. Throws `UNAUTHORIZED` if absent. Use this as the default for anything touching user data.
 
 ### Client Usage (`apps/web/trpc/`)
 
-The web app exposes two tRPC client variants:
+Two client variants, each with a distinct use case:
 
-- `trpc/client.ts` — React hooks (`useQuery`, `useMutation`) for Client Components
-- `trpc/server.ts` — Direct server-side caller for React Server Components and `generateStaticParams`
+- `trpc/server.ts` — Direct caller for React Server Components and `generateStaticParams`. No network round-trip; runs in the same process. **Prefer this wherever possible.**
+- `trpc/client.ts` — React hooks (`useQuery`, `useMutation`) for `"use client"` components. Use only when you need reactivity or client-side state.
 
-Use the server caller in Server Components to avoid unnecessary round-trips. Use the React hooks client only in `"use client"` components.
+Mixing these up is a common mistake. Using the hooks client in a Server Component adds an unnecessary network hop. Using the server caller in a Client Component will fail at runtime.
 
 ---
 
 ## OpenAPI & REST Layer
 
-The API server exposes a parallel **REST interface** alongside tRPC, generated automatically from the same router using [`trpc-to-openapi`](https://github.com/jlalmes/trpc-to-openapi). Both transports share identical business logic — there is no duplication.
-
-### How it works
+The REST interface is generated automatically from the tRPC router via [`trpc-to-openapi`](https://github.com/jlalmes/trpc-to-openapi). There is no separate REST implementation — both transports execute identical business logic.
 
 ```
 tRPC Router (source of truth)
         │
-        ├──► /trpc/*          tRPC wire protocol  (used by apps/web)
+        ├──► /trpc/*       tRPC wire protocol  (apps/web)
         │
-        └──► /api/*           REST via trpc-to-openapi  (used by external consumers)
+        └──► /api/*        REST via trpc-to-openapi  (external consumers)
                 │
                 └──► /openapi.json   Live OpenAPI 3.0 spec
-                └──► /docs           Scalar interactive UI
+                └──► /docs           Scalar interactive UI (dev only)
 ```
 
-`generateOpenApiDocument` introspects `serverRouter` at startup and produces a spec from procedure metadata. The spec is served live — it always reflects the current router state without a build step.
+The spec at `/openapi.json` is generated at startup from live router introspection. It is always current — no build step, no drift.
 
 ### Endpoints
 
@@ -255,39 +240,18 @@ tRPC Router (source of truth)
 | ----------------- | ------ | ------------------------------------ | ------------------------------------- |
 | Root ping         | `GET`  | `http://localhost:8000/`             | Liveness check, returns `{ message }` |
 | Health check      | `GET`  | `http://localhost:8000/health`       | Returns `{ healthy: true }`           |
-| OpenAPI spec      | `GET`  | `http://localhost:8000/openapi.json` | Live OpenAPI 3.0 JSON document        |
-| API docs (Scalar) | `GET`  | `http://localhost:8000/docs`         | Interactive API explorer (dev only)   |
+| OpenAPI spec      | `GET`  | `http://localhost:8000/openapi.json` | Live OpenAPI 3.0 JSON                 |
+| API docs (Scalar) | `GET`  | `http://localhost:8000/docs`         | Interactive explorer — dev only       |
 | REST API          | `*`    | `http://localhost:8000/api/*`        | REST routes via `trpc-to-openapi`     |
 | tRPC              | `POST` | `http://localhost:8000/trpc/*`       | tRPC wire protocol                    |
 
-> `/docs` and the permissive CORS policy (`origin: "*"`) are only mounted when `NODE_ENV !== "prod"`. In production, the REST API remains available but the documentation UI is disabled.
-
-### OpenAPI Document Metadata
-
-Defined in `apps/api/src/server.ts`:
-
-```typescript
-const openApiDocument = generateOpenApiDocument(serverRouter, {
-  title: "trpcProject OpenAPI",
-  version: "1.0.0",
-  baseUrl: env.BASE_URL.concat("/api"), // e.g. http://localhost:8000/api
-});
-```
-
-| Field    | Value                     |
-| -------- | ------------------------- |
-| Title    | `trpcProject OpenAPI`     |
-| Version  | `1.0.0`                   |
-| Base URL | `{BASE_URL}/api`          |
-| Spec URL | `{BASE_URL}/openapi.json` |
-| Docs UI  | `{BASE_URL}/docs`         |
+> `/docs` and the permissive CORS policy (`origin: "*"`) are only mounted when `NODE_ENV !== "prod"`. The REST API itself remains available in production.
 
 ### Annotating a Procedure for OpenAPI
 
-Only procedures with a `.meta({ openapi: { ... } })` block are included in the generated spec. Procedures without it remain tRPC-only.
+Only procedures with a `.meta({ openapi: { ... } })` block appear in the generated spec. Omitting it keeps the procedure tRPC-only.
 
 ```typescript
-// packages/trpc/server/routes/auth/route.ts
 export const authRouter = router({
   getSupportedAuthenticationProviders: publicProcedure
     .meta({
@@ -303,12 +267,12 @@ export const authRouter = router({
 });
 ```
 
-**Conventions:**
+**Conventions — these are enforced, not suggestions:**
 
-- Paths are generated via `generatePath(prefix)(suffix)` in `packages/trpc/server/utils/path-generator.ts`. Always use this utility — never hardcode path strings.
-- `tags` must be a string array matching an existing tag group. Use the `TAGS` constant pattern shown above to keep tags consistent within a domain.
-- `input` must be a Zod schema. Use `zodUndefinedModel` (re-exported from `schema.ts`) for procedures with no input — do not omit the field.
-- `output` must be a Zod schema. `trpc-to-openapi` uses it to generate the response shape in the spec.
+- Paths via `generatePath(prefix)(suffix)` in `packages/trpc/server/utils/path-generator.ts`. Never hardcode path strings.
+- `input` must be an explicit Zod schema. Use `zodUndefinedModel` for no-input procedures — do not omit the field; `trpc-to-openapi` requires it.
+- `output` must be an explicit Zod schema. `z.any()` will produce a useless spec entry and will be rejected in review.
+- `tags` must match an existing tag group. Use the `TAGS` constant pattern within a domain to prevent tag drift.
 
 ### Current REST Routes
 
@@ -316,126 +280,107 @@ export const authRouter = router({
 | -------------- | ------ | ----------------------------------------- | ------------------------------------------ |
 | Authentication | `GET`  | `/api/authentication/supported-providers` | `auth.getSupportedAuthenticationProviders` |
 
-### Adding a New REST-Exposed Procedure
-
-1. Define `.meta({ openapi: { method, path, tags } })` on the procedure
-2. Ensure `.input()` and `.output()` use explicit Zod schemas (no `z.any()`, no omissions)
-3. Use `generatePath` for the path — base path is the domain prefix (e.g. `/authentication`, `/users`)
-4. Restart the API server — the spec at `/openapi.json` updates automatically
-
 ---
 
 ## Database Layer
 
-**Schema definition:** `packages/database/schema.ts` → re-exports models from `packages/database/models/`
-
-**Migration workflow:**
+Schema definition lives in `packages/database/schema.ts`, which re-exports models from `packages/database/models/`.
 
 ```bash
-# Generate a migration after schema changes
-pnpm --filter @repo/database db:generate
-
-# Apply pending migrations
-pnpm --filter @repo/database db:migrate
-
-# Open Drizzle Studio (visual DB browser)
-pnpm --filter @repo/database db:studio
+pnpm --filter @repo/database db:generate   # generate migration after schema changes
+pnpm --filter @repo/database db:migrate    # apply pending migrations
+pnpm --filter @repo/database db:studio     # open Drizzle Studio
 ```
 
-> Migrations are stored in `packages/database/drizzle/` and committed to source control. Never modify generated migration files — create a new migration instead.
+Migrations are stored in `packages/database/drizzle/` and committed to source control. Never edit a generated migration file — if you need to correct a migration, generate a new one. Editing history breaks the migration chain for every environment that has already applied it.
 
-**Access pattern:** All database access goes through the client exported from `packages/database/index.ts`. Raw `pg` or direct connection strings elsewhere are not permitted.
+All DB access goes through the client exported from `packages/database/index.ts`. Direct `pg` connections or raw connection strings elsewhere are not permitted.
 
 ---
 
 ## Observability & Telemetry
 
-The `packages/observability` package initializes OpenTelemetry at process startup. It must be imported before any other module in `apps/api/src/index.ts` to ensure instrumentation is active for all downstream imports.
+`packages/observability` initializes the OpenTelemetry SDK. It **must** be the first import in `apps/api/src/index.ts`. OTEL instruments modules at import time — anything imported before the SDK initializes will not be traced.
 
 ```
 observability/
-├── src/otel/otel.ts       # OTEL SDK bootstrap (tracer, meter providers)
+├── src/otel/otel.ts       # SDK bootstrap (tracer, meter providers)
 ├── src/tracing/           # Trace exporters, span configuration
 ├── src/metrics/           # Custom metric definitions
 └── src/health/            # Health check endpoint handlers
 ```
 
-**tRPC tracing:** The `packages/logger/src/trpc.ts` middleware automatically creates spans for every tRPC procedure call, attaching procedure path, input shape, and error codes to the span.
+The `packages/logger/src/trpc.ts` middleware creates a span per tRPC procedure call and attaches procedure path, input shape, duration, and error codes automatically. You should not need to create spans manually inside procedure handlers.
 
-**Local telemetry:** The OTEL Collector is configured in `infra/otel-config.yaml`. Start it alongside the database via `infra/otel.compose.yml` when testing trace pipelines locally.
+For local trace pipeline testing, start the OTEL Collector via `infra/otel.compose.yml` alongside the database.
 
 ---
 
 ## Authentication Architecture
 
-Authentication is implemented as a self-contained module at `packages/modules/auth-service/`.
+Self-contained module at `packages/modules/auth-service/`. Nothing outside this module should know how authentication works internally.
 
 ```
 auth-service/
-├── application/           # Use cases (login, register, forgot-password, get-auth-methods)
+├── application/           # Use cases: login, register, forgot-password, get-auth-methods
 ├── contracts/             # DTOs and input validation schemas
 ├── infrastructure/
 │   ├── providers/         # OAuth provider adapters (Google, extensible)
 │   └── repositories/      # DB access — UserRepository
-└── index.ts               # Public API surface
+└── index.ts               # Public API surface — the only import path consumers should use
 ```
 
-**Design pattern:** Follows a lightweight application/infrastructure split. Application layer contains pure business logic. Infrastructure layer contains all I/O (DB queries, HTTP calls to OAuth providers).
+Application layer: pure business logic, no I/O. Infrastructure layer: all I/O (DB queries, OAuth HTTP calls). This split makes the application layer unit-testable without mocking a database.
 
 **Adding an OAuth provider:**
 
-1. Create a new adapter in `infrastructure/providers/`
-2. Implement the provider interface
-3. Register the provider in `application/get-authentication-methods.ts`
-4. Add the corresponding environment variables and validate in `env.ts`
+1. Create an adapter in `infrastructure/providers/` implementing the provider interface
+2. Register it in `application/get-authentication-methods.ts`
+3. Add and validate the required env vars in `env.ts`
 
 ---
 
 ## Module System (DDD Boundaries)
 
-Each subdirectory of `packages/modules/` is a bounded context. The public API of a module is defined exclusively by its `index.ts` exports. Do not import from internal paths of another module.
+Each `packages/modules/<domain>-service/` directory is a bounded context. Its public API is defined exclusively by `index.ts`. Internal paths are implementation details.
 
 ```typescript
-// ✅ Correct — import from module's public API
+// ✅ Correct
 import { loginUser } from "@repo/modules/auth-service";
 
-// ❌ Wrong — bypasses module boundary
+// ❌ Wrong — bypasses the module boundary, couples you to internal structure
 import { loginUser } from "@repo/modules/auth-service/application/login";
 ```
 
-When a new domain is needed:
+This isn't just style. Importing internal paths means a refactor inside the module can break consumers without any change to the public contract. The boundary is the contract.
 
-1. Create `packages/modules/<domain>-service/`
-2. Mirror the `auth-service` structure: `application/`, `contracts/`, `infrastructure/`, `index.ts`
-3. Add `package.json` with the `@repo/modules/<domain>-service` name
-4. Register in `pnpm-workspace.yaml` if not already covered by the glob
-5. Add tRPC routes in `packages/trpc/server/routes/<domain>/`
+**Adding a new domain:**
+
+1. Create `packages/modules/<domain>-service/` mirroring `auth-service` structure: `application/`, `contracts/`, `infrastructure/`, `index.ts`
+2. Add `package.json` with name `@repo/modules/<domain>-service`
+3. Confirm it's covered by the glob in `pnpm-workspace.yaml` (or add it explicitly)
+4. Add tRPC routes in `packages/trpc/server/routes/<domain>/`
 
 ---
 
 ## Build Pipeline & Caching
 
-`turbo.json` defines the task dependency graph. Key tasks:
+`turbo.json` defines the task dependency graph. Turborepo will not run a task until all declared upstream dependencies have completed successfully.
 
-| Task         | Depends On                                   | Cache |
-| ------------ | -------------------------------------------- | ----- |
-| `build`      | `^build` (all package deps must build first) | Yes   |
-| `dev`        | —                                            | No    |
-| `lint`       | `^lint`                                      | Yes   |
-| `test`       | `^build`                                     | Yes   |
-| `db:migrate` | —                                            | No    |
+| Task         | Depends On                                   | Cached |
+| ------------ | -------------------------------------------- | ------ |
+| `build`      | `^build` (all package deps must build first) | Yes    |
+| `dev`        | —                                            | No     |
+| `lint`       | `^lint`                                      | Yes    |
+| `test`       | `^build`                                     | Yes    |
+| `db:migrate` | —                                            | No     |
 
-**Remote Caching** with Vercel is strongly recommended for CI environments. Without it, every CI run rebuilds unchanged packages.
+**Remote caching** via Vercel is mandatory for CI at scale. Without it, every CI run is a cold build. With it, unchanged packages are fetched from cache in seconds.
 
 ```bash
-# Authenticate (one-time)
-turbo login
-
-# Link this repo to remote cache
-turbo link
+turbo login   # one-time auth
+turbo link    # link repo to remote cache
 ```
-
-Once linked, `turbo build` skips packages whose inputs haven't changed, fetching outputs from the remote cache instead. This brings cold CI builds from minutes to seconds for unchanged packages.
 
 **Generating the file tree:**
 
@@ -452,10 +397,12 @@ find . -type d \( -name node_modules -o -name dist -o -name build \
 ### Adding a New Package
 
 ```bash
-# Create package directory
 mkdir -p packages/<name>/src
+```
 
-# Minimal package.json
+Minimal `package.json`:
+
+```json
 {
   "name": "@repo/<name>",
   "version": "0.0.1",
@@ -465,52 +412,48 @@ mkdir -p packages/<name>/src
     "@repo/typescript-config": "workspace:*"
   }
 }
-
-# Extend appropriate tsconfig
-# node packages → typescript-config/node.json
-# Next.js packages → typescript-config/nextjs.json
 ```
+
+Extend the appropriate tsconfig: `typescript-config/node.json` for Node packages, `typescript-config/nextjs.json` for Next.js packages.
 
 ### Adding a New App
 
 ```bash
-# Next.js
 pnpx create-next-app apps/<name> --typescript
-
-# Update apps/<name>/package.json to use workspace tsconfig and eslint-config
+# Update package.json to reference workspace tsconfig and eslint-config
 ```
 
 ---
 
 ## Code Quality Guardrails
 
-**ESLint:** Shared configs in `packages/eslint-config/`. Three profiles:
+**ESLint** — shared configs in `packages/eslint-config/`:
 
 - `base.js` — all TypeScript packages
-- `next.js` — Next.js apps (extends base + next-specific rules)
+- `next.js` — Next.js apps (extends base)
 - `react-internal.js` — shared React component libraries
 
-**TypeScript:** Strict mode is enabled across all packages via `packages/typescript-config/base.json`. `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and `strictNullChecks` are all active. Do not weaken these settings without team consensus.
+**TypeScript** — strict mode across all packages via `packages/typescript-config/base.json`. `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, and `strictNullChecks` are all active. Do not weaken these settings. If a type is hard to satisfy, the design probably needs revisiting — not the compiler settings.
 
-**Formatting:** Prettier config at `prettier.config.js`. Enforced in CI. Run `pnpm format` to apply.
+**Formatting** — Prettier at `prettier.config.js`. Enforced in CI. Run `pnpm format` locally before pushing.
 
-**Pre-commit:** Configure `lint-staged` + `husky` if not already present on your branch to catch lint and format violations before they reach CI.
+**Pre-commit** — configure `lint-staged` + `husky` if not already on your branch. Catching lint and format violations pre-commit is cheaper than a CI failure.
 
 ---
 
 ## Service URLs
 
-| Service           | URL                                  | Notes                                                             |
-| ----------------- | ------------------------------------ | ----------------------------------------------------------------- |
-| Web App           | `http://localhost:3000`              | Next.js frontend                                                  |
-| API Root          | `http://localhost:8000/`             | Liveness ping — `{ message: "trpcProject is up and running..." }` |
-| API Health        | `http://localhost:8000/health`       | `{ healthy: true }` — use for readiness probes                    |
-| OpenAPI Spec      | `http://localhost:8000/openapi.json` | Live OpenAPI 3.0 JSON — regenerated from router at startup        |
-| API Docs (Scalar) | `http://localhost:8000/docs`         | Interactive explorer — **dev only** (`NODE_ENV !== "prod"`)       |
-| REST API          | `http://localhost:8000/api/*`        | REST interface via `trpc-to-openapi`                              |
-| tRPC Endpoint     | `http://localhost:8000/trpc/*`       | tRPC wire protocol — used by `apps/web`                           |
-| Drizzle Studio    | `https://local.drizzle.studio`       | Local DB browser (requires `pnpm db:studio`)                      |
-| PostgreSQL        | `localhost:5432/dev`                 | Direct connection                                                 |
+| Service           | URL                                  | Notes                                                              |
+| ----------------- | ------------------------------------ | ------------------------------------------------------------------ |
+| Web App           | `http://localhost:3000`              | Next.js frontend                                                   |
+| API Root          | `http://localhost:8000/`             | Liveness ping — `{ message: "trpcProject is up and running..." }`  |
+| API Health        | `http://localhost:8000/health`       | `{ healthy: true }` — use for readiness probes                     |
+| OpenAPI Spec      | `http://localhost:8000/openapi.json` | Live OpenAPI 3.0 JSON — regenerated from router at startup         |
+| API Docs (Scalar) | `http://localhost:8000/docs`         | Interactive explorer — dev only (`NODE_ENV !== "prod"`)            |
+| REST API          | `http://localhost:8000/api/*`        | REST interface via `trpc-to-openapi`                               |
+| tRPC Endpoint     | `http://localhost:8000/trpc/*`       | tRPC wire protocol — used by `apps/web`                            |
+| Drizzle Studio    | `https://local.drizzle.studio`       | Local DB browser (requires `pnpm db:studio`)                       |
+| PostgreSQL        | `localhost:5432/dev`                 | Direct connection                                                  |
 
 ---
 
